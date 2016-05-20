@@ -563,8 +563,143 @@ def forestplot(trace_obj, varnames=None, alpha=0.05, quartiles=True, rhat=True,
     return gs
 
 
-def plot_posterior(trace, varnames=None, figsize=None, alpha_level=0.05, round_to=3,
-                   point_estimate='mean', rope=None, ref_val=None, kde_plot=False, ax=None, **kwargs):
+def plot_posterior(trace_values, alpha_level=0.05, round_to=3,
+                   point_estimate='mean', rope=None, ref_val=None,
+                   kde_plot=False, ax=None, **kwargs):
+    """Plot Posterior densitiy of a trace in style of John K. Kruschke book
+
+    Parameters
+    ----------
+
+    trace_values : single variable trace of an MCMC run
+    figsize : figure size tuple
+        If None, size is (12, num of variables * 2) inch
+    alpha_level : float
+        Defines range for High Posterior Density
+    round_to : int
+        Controls formatting for floating point numbers
+    point_estimate: str
+        Must be in ('mode', 'mean', 'median')
+    rope: list or numpy array
+        Lower and upper values of the Region Of Practical Equivalence
+    ref_val: bool
+        display the percentage below and above ref_val
+    kde_plot: bool
+        if True plot a KDE instead of a histogram
+    ax : axes
+        Matplotlib axes object. Defaults to None.
+    **kwargs
+        Passed as-is to plt.hist() or plt.plot() function, depending on the
+        value of the argument kde_plot
+        Some defaults are added, if not specified
+        color='#87ceeb' will match the style in the book
+
+
+    Returns
+    -------
+
+    ax : matplotlib axes
+
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    def format_as_percent(x, round_to=0):
+        value = np.round(100 * x, round_to)
+        if round_to == 0:
+            value = int(value)
+        return '{}%'.format(value)
+
+    def display_ref_val(ref_val):
+        less_than_ref_probability = (trace_values < ref_val).mean()
+        greater_than_ref_probability = (trace_values >= ref_val).mean()
+        ref_in_posterior = format_as_percent(less_than_ref_probability, 1) + ' <{:g}< '.format(ref_val) + format_as_percent(
+            greater_than_ref_probability, 1)
+        ax.axvline(ref_val, ymin=0.02, ymax=.75, color='g',
+        linewidth=4, alpha=0.65)
+        ax.text(trace_values.mean(), plot_height * 0.6, ref_in_posterior,
+                    size=14, horizontalalignment='center')
+
+    def display_rope(rope):
+        pc_in_rope = format_as_percent(np.sum((trace_values > rope[0]) &
+        (trace_values < rope[1]))/len(trace_values), round_to)
+        ax.plot(rope, (plot_height * 0.02, plot_height * 0.02),
+        linewidth=20, color='r', alpha=0.75)
+        text_props = dict(size=16, horizontalalignment='center', color='r')
+        ax.text(rope[0], plot_height * 0.14, rope[0], **text_props)
+        ax.text(rope[1], plot_height * 0.14, rope[1], **text_props)
+
+    def display_point_estimate():
+        if not point_estimate:
+            return
+        if point_estimate not in ('mode', 'mean', 'median'):
+            raise ValueError("Point Estimate should be in ('mode','mean','median', None)")
+        if point_estimate == 'mean':
+            point_value = trace_values.mean()
+            point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
+        elif point_estimate == 'mode':
+            point_value = stats.mode(trace_values.round(round_to))[0][0]
+            point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
+        elif point_estimate == 'median':
+            point_value = np.median(trace_values)
+            point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
+
+        ax.text(point_value, plot_height * 0.8, point_text,
+                size=16, horizontalalignment='center')
+
+    def display_hpd():
+        hpd_intervals = hpd(trace_values, alpha=alpha_level)
+        ax.plot(hpd_intervals, (plot_height * 0.02, plot_height * 0.02), linewidth=4, color='k')
+        text_props = dict(size=16, horizontalalignment='center')
+        ax.text(hpd_intervals[0], plot_height * 0.07, hpd_intervals[0].round(round_to), **text_props)
+        ax.text(hpd_intervals[1], plot_height * 0.07, hpd_intervals[1].round(round_to), **text_props)
+        ax.text((hpd_intervals[0] + hpd_intervals[1]) / 2, plot_height * 0.2,
+                format_as_percent(1 - alpha_level) + ' HPD', **text_props)
+
+    def format_axes():
+        ax.yaxis.set_ticklabels([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(True)
+        ax.yaxis.set_ticks_position('none')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.tick_params(axis='x', direction='out', width=1, length=3,
+                       color='0.5')
+        ax.spines['bottom'].set_color('0.5')
+
+    def set_key_if_doesnt_exist(d, key, value):
+        if key not in d:
+            d[key] = value
+
+
+    if kde_plot:
+        density = kde.gaussian_kde(trace_values)
+        l = np.min(trace_values)
+        u = np.max(trace_values)
+        x = np.linspace(0, 1, 100) * (u - l) + l
+        ax.plot(x, density(x), **kwargs)
+    else:
+        set_key_if_doesnt_exist(kwargs, 'bins', 30)
+        set_key_if_doesnt_exist(kwargs, 'edgecolor', 'w')
+        set_key_if_doesnt_exist(kwargs, 'align', 'right')
+        ax.hist(trace_values, **kwargs)
+
+    plot_height = ax.get_ylim()[1]
+
+    format_axes()
+    display_hpd()
+    display_point_estimate()
+    if ref_val is not None:
+        display_ref_val(ref_val)
+    if rope is not None:
+        display_rope(rope)
+
+    return ax
+
+
+def plot_posteriors(trace, varnames=None, figsize=None, alpha_level=0.05, round_to=3,
+                    point_estimate='mean', rope=None, ref_val=None, kde_plot=False, ax=None, **kwargs):
     """Plot Posterior densities in style of John K. Kruschke book
 
     Parameters
@@ -588,9 +723,9 @@ def plot_posterior(trace, varnames=None, figsize=None, alpha_level=0.05, round_t
     kde_plot: bool
         if True plot a KDE instead of a histogram
     ax : axes
-        Matplotlib axes. Defaults to None.
+        Iterable matplotlib axes objects. Defaults to None.
     **kwargs
-        Passed as-is to plt.hist() or plt.plot() function, depending on the 
+        Passed as-is to plt.hist() or plt.plot() function, depending on the
         value of the argument kde_plot
         Some defaults are added, if not specified
         color='#87ceeb' will match the style in the book
@@ -603,99 +738,6 @@ def plot_posterior(trace, varnames=None, figsize=None, alpha_level=0.05, round_t
 
     """
 
-    def plot_posterior_op(trace_values, ax):
-
-        def format_as_percent(x, round_to=0):
-            value = np.round(100 * x, round_to)
-            if round_to == 0:
-                value = int(value)
-            return '{}%'.format(value)
-
-        def display_ref_val(ref_val):
-            less_than_ref_probability = (trace_values < ref_val).mean()
-            greater_than_ref_probability = (trace_values >= ref_val).mean()
-            ref_in_posterior = format_as_percent(less_than_ref_probability, 1) + ' <{:g}< '.format(ref_val) + format_as_percent(
-                greater_than_ref_probability, 1)
-            ax.axvline(ref_val, ymin=0.02, ymax=.75, color='g', 
-            linewidth=4, alpha=0.65)
-            ax.text(trace_values.mean(), plot_height * 0.6, ref_in_posterior,
-                        size=14, horizontalalignment='center')
-                        
-        def display_rope(rope):
-            pc_in_rope = format_as_percent(np.sum((trace_values > rope[0]) & 
-            (trace_values < rope[1]))/len(trace_values), round_to)
-            ax.plot(rope, (plot_height * 0.02, plot_height * 0.02), 
-            linewidth=20, color='r', alpha=0.75)
-            text_props = dict(size=16, horizontalalignment='center', color='r')
-            ax.text(rope[0], plot_height * 0.14, rope[0], **text_props)
-            ax.text(rope[1], plot_height * 0.14, rope[1], **text_props)
-
-        def display_point_estimate():
-            if not point_estimate:
-                return
-            if point_estimate not in ('mode', 'mean', 'median'):
-                raise ValueError("Point Estimate should be in ('mode','mean','median', None)")
-            if point_estimate == 'mean':
-                point_value = trace_values.mean()
-                point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
-            elif point_estimate == 'mode':
-                point_value = stats.mode(trace_values.round(round_to))[0][0]
-                point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
-            elif point_estimate == 'median':
-                point_value = np.median(trace_values)
-                point_text = '{}={}'.format(point_estimate, point_value.round(round_to))
-
-            ax.text(point_value, plot_height * 0.8, point_text,
-                    size=16, horizontalalignment='center')
-
-        def display_hpd():
-            hpd_intervals = hpd(trace_values, alpha=alpha_level)
-            ax.plot(hpd_intervals, (plot_height * 0.02, plot_height * 0.02), linewidth=4, color='k')
-            text_props = dict(size=16, horizontalalignment='center')
-            ax.text(hpd_intervals[0], plot_height * 0.07, hpd_intervals[0].round(round_to), **text_props)
-            ax.text(hpd_intervals[1], plot_height * 0.07, hpd_intervals[1].round(round_to), **text_props)
-            ax.text((hpd_intervals[0] + hpd_intervals[1]) / 2, plot_height * 0.2,
-                    format_as_percent(1 - alpha_level) + ' HPD', **text_props)
-
-        def format_axes():
-            ax.yaxis.set_ticklabels([])
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.spines['bottom'].set_visible(True)
-            ax.yaxis.set_ticks_position('none')
-            ax.xaxis.set_ticks_position('bottom')
-            ax.tick_params(axis='x', direction='out', width=1, length=3,
-                           color='0.5')
-            ax.spines['bottom'].set_color('0.5')
-
-        def set_key_if_doesnt_exist(d, key, value):
-            if key not in d:
-                d[key] = value
-
-
-        if kde_plot:
-            density = kde.gaussian_kde(trace_values)
-            l = np.min(trace_values)
-            u = np.max(trace_values)
-            x = np.linspace(0, 1, 100) * (u - l) + l
-            ax.plot(x, density(x), **kwargs)    
-        else:
-            set_key_if_doesnt_exist(kwargs, 'bins', 30)
-            set_key_if_doesnt_exist(kwargs, 'edgecolor', 'w')
-            set_key_if_doesnt_exist(kwargs, 'align', 'right')        
-            ax.hist(trace_values, **kwargs)
-
-        plot_height = ax.get_ylim()[1]
-
-        format_axes()
-        display_hpd()
-        display_point_estimate()
-        if ref_val is not None:
-            display_ref_val(ref_val)
-        if rope is not None:
-            display_rope(rope)
-
     def create_axes_grid(figsize, varnames):
         n = np.ceil(len(varnames) / 2.0).astype(int)
         if figsize is None:
@@ -705,24 +747,26 @@ def plot_posterior(trace, varnames=None, figsize=None, alpha_level=0.05, round_t
         if len(varnames) % 2 == 1:
             ax[-1].set_axis_off()
             ax = ax[:-1]
-        return ax, fig
+        return fig, ax
 
     if isinstance(trace, np.ndarray):
         if figsize is None:
             figsize = (6, 2)
         if ax is None:
             fig, ax = plt.subplots()
-            plot_posterior_op(trace, ax)
+            plot_posterior(trace, ax)
     else:
         if varnames is None:
             varnames = trace.original_varnames
 
         if ax is None:
-            ax, fig = create_axes_grid(figsize, varnames)
+            fig, ax = create_axes_grid(figsize, varnames)
+        else:
+            fig = ax[-1].get_figure()
 
         for a, v in zip(ax, varnames):
             tr_values = trace.get_values(v, combine=True, squeeze=True)
-            plot_posterior_op(tr_values, ax=a)
+            plot_posterior(tr_values, ax=a)
             a.set_title(v)
 
     fig.tight_layout()
