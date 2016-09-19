@@ -797,4 +797,4 @@ class ScalarParameterSamples(SeededTest):
 
     def test_lkj(self):
         # To do: generate random numbers.
-        raise SkipTest('LJK random sampling not implemented yet.')
+        raise SkipTest('LKJ random sampling not implemented yet.')
