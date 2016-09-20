@@ -453,6 +453,48 @@ def WishartBartlett(name, S, nu, is_cholesky=False, return_cholesky=False, testv
         return Deterministic(name, tt.dot(tt.dot(tt.dot(L, A), A.T), L.T))
 
 
+class HWCov(Continuous):
+	R"""
+	Huang and Wand (2013) covariance matrix log-likelihood.
+
+	A distribution for positive-definite matrices, intended to be used as 
+	a prior (often uninformative) for covariance matrices. It is a generalization
+	of the half-Student T prior in the univariate case. This prior implies half-T
+   distributions on the standard deviations and uniform(-1,1) distributions on the
+	correlation coefficients.
+
+	Parameters
+	----------
+
+	nu : float
+		Shape parameter (nu > 0).
+	p  : int
+		Dimension of covariance matrix (p > 1).
+	a  : array of floats
+		Positive scalars of length p.
+
+	Reference
+	---------
+	.. [HW2013] Huang, A., & Wand, M. P. (2013). Simple marginally 
+		noninformative prior distributions for covariance matrices. 
+		Bayesian Analysis. http://doi.org/10.1214/13-BA815
+	"""
+
+	def __init__(self, nu, p, a, *args, **kwargs):
+		self.nu = nu
+		self.p = p
+		self.a = a
+		super(HWCov, self).__init__(*args, **kwargs)
+
+	def logp(self, X):
+		nu = self.nu
+		p = self.p
+		a = self.a
+
+		return bound(matrix_pos_def(X),
+                     nu > 0)
+		
+
 class LKJCorr(Continuous):
     R"""
     The LKJ (Lewandowski, Kurowicka and Joe) log-likelihood.
