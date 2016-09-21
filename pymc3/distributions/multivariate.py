@@ -488,6 +488,7 @@ class HWCov(Continuous):
     def __init__(self, nu, a, *args, **kwargs):
         self.nu = nu
         self.a = a
+        self.mean = tt.nlinalg.AllocDiag(a)
         super(HWCov, self).__init__(*args, **kwargs)
         
     def random(self, point=None, size=None):
