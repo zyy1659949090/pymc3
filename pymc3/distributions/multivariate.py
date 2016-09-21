@@ -488,7 +488,7 @@ class HWCov(Continuous):
     def __init__(self, nu, a, *args, **kwargs):
         self.nu = nu
         self.a = a
-        self.mean = tt.nlinalg.AllocDiag(a)
+        self.mean = tt.nlinalg.alloc_diag(a)
         super(HWCov, self).__init__(*args, **kwargs)
         
     def random(self, point=None, size=None):
@@ -496,7 +496,7 @@ class HWCov(Continuous):
 
         def _random(nu, a, size=None):
             alpha = stats.invgamma.rvs(a=0.5, scale=1/(a**2))
-            return stats.invwishart.rvs(df=nu+p-1, scale=2*nu*tt.nlinalg.AllocDiag(1/alpha))
+            return stats.invwishart.rvs(df=nu+p-1, scale=2*nu*tt.nlinalg.alloc_diag(1/alpha))
 
         samples = generate_samples(_random, nu, a,
                                    dist_shape=self.shape,
