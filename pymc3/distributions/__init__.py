@@ -50,6 +50,7 @@ from .multivariate import Multinomial
 from .multivariate import Wishart
 from .multivariate import WishartBartlett
 from .multivariate import LKJCorr
+from .multivariate import HWCov
 
 from .timeseries import AR1
 from .timeseries import GaussianRandomWalk
@@ -106,6 +107,7 @@ __all__ = ['Uniform',
            'Wishart',
            'WishartBartlett',
            'LKJCorr',
+           'HWCov',
            'AR1',
            'GaussianRandomWalk',
            'GARCH11'

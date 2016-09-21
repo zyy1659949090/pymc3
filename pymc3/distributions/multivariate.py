@@ -18,7 +18,7 @@ from .special import gammaln, multigammaln
 from .dist_math import bound, logpow, factln
 
 __all__ = ['MvNormal', 'MvStudentT', 'Dirichlet',
-           'Multinomial', 'Wishart', 'WishartBartlett', 'LKJCorr']
+           'Multinomial', 'Wishart', 'WishartBartlett', 'LKJCorr', 'HWCov']
 
 
 class MvNormal(Continuous):
@@ -454,46 +454,66 @@ def WishartBartlett(name, S, nu, is_cholesky=False, return_cholesky=False, testv
 
 
 class HWCov(Continuous):
-	R"""
-	Huang and Wand (2013) covariance matrix log-likelihood.
+    R"""
+    Huang and Wand (2013) covariance matrix log-likelihood.
 
-	A distribution for positive-definite matrices, intended to be used as 
-	a prior (often uninformative) for covariance matrices. It is a generalization
-	of the half-Student T prior in the univariate case. This prior implies half-T
+    A distribution for positive-definite matrices, intended to be used as 
+    a prior (often uninformative) for covariance matrices. It is a generalization
+    of the half-Student T prior in the univariate case. This prior implies half-T
    distributions on the standard deviations and uniform(-1,1) distributions on the
-	correlation coefficients.
+    correlation coefficients.
 
-	Parameters
-	----------
+    Parameters
+    ----------
 
-	nu : float
-		Shape parameter (nu > 0).
-	p  : int
-		Dimension of covariance matrix (p > 1).
-	a  : array of floats
-		Positive scalars of length p.
+    nu : float
+        Shape parameter (nu > 0).
+    a  : array of floats
+        Positive scalars of length p (size of matrix)
+    
+    .. math::
 
-	Reference
-	---------
-	.. [HW2013] Huang, A., & Wand, M. P. (2013). Simple marginally 
-		noninformative prior distributions for covariance matrices. 
-		Bayesian Analysis. http://doi.org/10.1214/13-BA815
-	"""
+       f(\mathbf{S}) \propto |\mathbf{S}|^{-(\nu+2p)/2}\prod_{k=1}^p 
+            \left[\nu \left(\mathbf{S}^{-1}\right)_{kk} 
+            + \frac{1}{a^2_k}\right]^{-(\nu+p)/2}
+           
 
-	def __init__(self, nu, p, a, *args, **kwargs):
-		self.nu = nu
-		self.p = p
-		self.a = a
-		super(HWCov, self).__init__(*args, **kwargs)
+    Reference
+    ---------
+    .. [HW2013] Huang, A., & Wand, M. P. (2013). Simple marginally 
+        noninformative prior distributions for covariance matrices. 
+        Bayesian Analysis. http://doi.org/10.1214/13-BA815
+    """
 
-	def logp(self, X):
-		nu = self.nu
-		p = self.p
-		a = self.a
+    def __init__(self, nu, a, *args, **kwargs):
+        self.nu = nu
+        self.a = a
+        super(HWCov, self).__init__(*args, **kwargs)
+        
+    def random(self, point=None, size=None):
+        nu, a = draw_values([self.nu, self.a], point=point)
 
-		return bound(matrix_pos_def(X),
-                     nu > 0)
-		
+        def _random(nu, a, size=None):
+            alpha = stats.invgamma.rvs(a=0.5, scale=1/(a**2))
+            return stats.invwishart.rvs(df=nu+p-1, scale=2*nu*tt.nlinalg.AllocDiag(1/alpha))
+
+        samples = generate_samples(_random, nu, a,
+                                   dist_shape=self.shape,
+                                   size=size)
+        return samples
+
+    def logp(self, S):
+        nu = self.nu
+        p = self.shape[0]
+        a = self.a
+        
+        S_inv_diag = matrix_inverse(S).diagonal()
+
+        return bound(-0.5*(nu + 2*p)*tt.log(det(S))
+                    + (-0.5*(nu + p)*tt.log(nu*S_inv_diag + 1/(a**2))).sum(),
+                    matrix_pos_def(S),
+                    nu > 0)
+        
 
 class LKJCorr(Continuous):
     R"""
