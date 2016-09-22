@@ -488,6 +488,7 @@ class HWCov(Continuous):
     def __init__(self, nu, a, *args, **kwargs):
         self.nu = nu
         self.a = a
+        self.p = p = a.shape[0]
         self.mean = tt.nlinalg.alloc_diag(a)
         super(HWCov, self).__init__(*args, **kwargs)
         
@@ -505,8 +506,8 @@ class HWCov(Continuous):
 
     def logp(self, S):
         nu = self.nu
-        p = self.shape[0]
         a = self.a
+        p = self.p
         
         S_inv_diag = matrix_inverse(S).diagonal()
 
