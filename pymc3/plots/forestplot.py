@@ -116,7 +116,7 @@ def _plot_tree(ax, y, ntiles, show_quartiles):
 
 def forestplot(trace_obj, varnames=None, transform=identity_transform, alpha=0.05, quartiles=True,
                rhat=True, main=None, xtitle=None, xlim=None, ylabels=None,
-               chain_spacing=0.05, vline=0, gs=None, plot_transformed=False):
+               chain_spacing=0.05, vline=0, vline_alpha=0.7, gs=None, plot_transformed=False):
     """
     Forest plot (model summary plot).
 
@@ -155,6 +155,8 @@ def forestplot(trace_obj, varnames=None, transform=identity_transform, alpha=0.0
         Plot spacing between chains (defaults to 0.05).
     vline (optional): numeric
         Location of vertical reference line (defaults to 0).
+    vline_alpha (optional): numeric
+        Alpha value for vertical reference line (defaults to 0.7)
     gs : GridSpec
         Matplotlib GridSpec object. Defaults to None.
     plot_transformed : bool
@@ -293,7 +295,8 @@ def forestplot(trace_obj, varnames=None, transform=identity_transform, alpha=0.0
             spine.set_color('none')  # don't draw spine
 
     # Reference line
-    interval_plot.axvline(vline, color='k', linestyle='--')
+    if vline is not None:
+        interval_plot.axvline(vline, color='k', linestyle='--', alpha=vline_alpha)
 
     # Genenerate Gelman-Rubin plot
     if plot_rhat:
